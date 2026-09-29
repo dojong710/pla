@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 구글 시트 인포그래픽 대시보드</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Google Fonts (Inter & Noto Sans KR) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card-hover:hover {
+            transform: translateY(-3px);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 12px 24px -10px rgba(59, 130, 246, 0.25);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .pulse-indicator {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            animation: pulse-ring 2s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+        @keyframes pulse-ring {
+            to {
+                box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-40 glass-card border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 lg:px-8 py-3">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            <!-- Logo & Title -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="fas fa-chart-line text-white text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-bold text-white tracking-tight">실시간 인포그래픽 대시보드</h1>
+                        <span id="liveStatusBadge" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 pulse-indicator"></span>
+                            라이브 동기화
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                        <i class="fa-brands fa-google-drive text-emerald-400"></i>
+                        <span class="truncate max-w-xs md:max-w-md font-mono text-slate-300" id="currentSheetIdDisplay">1-8zGVGD9o65MTQtJzwMZDRlkNocCi-ciYwGYPkozKG8</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Controls & Actions -->
+            <div class="flex items-center flex-wrap gap-2 text-sm">
+                
+                <!-- Refresh Interval Selector -->
+                <div class="flex items-center bg-slate-800/80 rounded-lg p-1 border border-slate-700/60">
+                    <i class="fas fa-clock text-slate-400 px-2 text-xs"></i>
+                    <select id="refreshIntervalSelect" onchange="handleIntervalChange()" class="bg-transparent text-xs text-slate-200 focus:outline-none pr-2 cursor-pointer font-medium">
+                        <option value="0" class="bg-slate-800 text-slate-200">수동 새로고침</option>
+                        <option value="10" selected class="bg-slate-800 text-slate-200">10초마다 자동</option>
+                        <option value="30" class="bg-slate-800 text-slate-200">30초마다 자동</option>
+                        <option value="60" class="bg-slate-800 text-slate-200">1분마다 자동</option>
+                    </select>
+                </div>
+
+                <!-- Refresh Button -->
+                <button onclick="loadDashboardData()" id="refreshBtn" title="지금 새로고침" 
+                    class="p-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all flex items-center gap-2 font-medium shadow-md shadow-blue-600/20 active:scale-95">
+                    <i class="fas fa-sync-alt text-xs" id="refreshIcon"></i>
+                    <span class="hidden sm:inline text-xs">새로고침</span>
+                </button>
+
+                <!-- Data Source Settings Modal Trigger -->
+                <button onclick="openSettingsModal()" class="p-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all flex items-center gap-1.5 text-xs font-medium">
+                    <i class="fas fa-sliders-h"></i>
+                    <span>연동 설정</span>
+                </button>
+
+                <!-- Print / Report -->
+                <button onclick="window.print()" class="p-2 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all text-xs" title="보고서 인쇄">
+                    <i class="fas fa-print"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- Banner Alert for Sheet Status & Fallback Info -->
+        <div id="statusAlert" class="hidden rounded-xl p-4 border transition-all text-sm flex items-start justify-between gap-3">
+            <div class="flex items-start gap-3">
+                <i class="fas fa-info-circle text-lg mt-0.5" id="statusAlertIcon"></i>
+                <div>
+                    <h4 class="font-semibold" id="statusAlertTitle">알림</h4>
+                    <p class="text-xs opacity-90 mt-0.5" id="statusAlertMessage"></p>
+                </div>
+            </div>
+            <button onclick="closeStatusAlert()" class="opacity-70 hover:opacity-100 p-1">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- KPI Metrics Grid (Infographic Cards) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- KPI 1: Total Records -->
+            <div class="glass-card glass-card-hover rounded-2xl p-5 relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/20 transition-all"></div>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">전체 데이터 수</span>
+                    <div class="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center">
+                        <i class="fas fa-database text-sm"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-baseline justify-between">
+                    <span class="text-3xl font-extrabold text-white tracking-tight" id="kpiTotalRecords">0</span>
+                    <span class="text-xs text-blue-400 font-medium flex items-center gap-1">
+                        <i class="fas fa-list-numeric"></i> 행 데이터
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                    <span class="text-emerald-400 font-medium" id="kpiRecordsSub">실시간 반영됨</span>
+                </p>
+            </div>
+
+            <!-- KPI 2: Primary Metric Sum -->
+            <div class="glass-card glass-card-hover rounded-2xl p-5 relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition-all"></div>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider" id="kpiMetric1Title">주요 수치 합계</span>
+                    <div class="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                        <i class="fas fa-calculator text-sm"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-baseline justify-between">
+                    <span class="text-3xl font-extrabold text-white tracking-tight" id="kpiMetric1Value">0</span>
+                    <span class="text-xs text-emerald-400 font-medium" id="kpiMetric1Badge">누적 합계</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 truncate" id="kpiMetric1Sub">
+                    수치 데이터의 자동 총합
+                </p>
+            </div>
+
+            <!-- KPI 3: Average Metric -->
+            <div class="glass-card glass-card-hover rounded-2xl p-5 relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-violet-500/10 rounded-full blur-xl group-hover:bg-violet-500/20 transition-all"></div>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider" id="kpiMetric2Title">평균 지표</span>
+                    <div class="w-9 h-9 rounded-xl bg-violet-500/15 text-violet-400 flex items-center justify-center">
+                        <i class="fas fa-chart-pie text-sm"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-baseline justify-between">
+                    <span class="text-3xl font-extrabold text-white tracking-tight" id="kpiMetric2Value">0</span>
+                    <span class="text-xs text-violet-400 font-medium" id="kpiMetric2Badge">평균값</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 truncate" id="kpiMetric2Sub">
+                    항목당 평균 백분율/값
+                </p>
+            </div>
+
+            <!-- KPI 4: Top Category -->
+            <div class="glass-card glass-card-hover rounded-2xl p-5 relative overflow-hidden group">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/20 transition-all"></div>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider" id="kpiTopCategoryTitle">최다 항목 카테고리</span>
+                    <div class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
+                        <i class="fas fa-trophy text-sm"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-baseline justify-between">
+                    <span class="text-2xl font-bold text-white truncate max-w-[170px]" id="kpiTopCategoryValue">-</span>
+                    <span class="text-xs text-amber-400 font-semibold" id="kpiTopCategoryCount">0건</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 truncate" id="kpiTopCategorySub">
+                    가장 비중이 높은 분류
+                </p>
+            </div>
+        </section>
+
+        <!-- Infographic Highlights & Dynamic Metrics Row -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Quick Summary Infographic Card -->
+            <div class="glass-card rounded-2xl p-6 lg:col-span-1 flex flex-col justify-between relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 rounded-full blur-2xl"></div>
+                
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fas fa-lightbulb text-amber-400"></i>
+                            데이터 핵심 요약
+                        </h3>
+                        <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-mono border border-slate-700" id="dataColumnsCount">0개 열</span>
+                    </div>
+
+                    <p class="text-xs text-slate-300 leading-relaxed mb-6" id="infographicSummaryText">
+                        구글 시트 수집 데이터에 대한 주요 분포 및 트렌드 분석 요약입니다.
+                    </p>
+
+                    <!-- Metric Distribution Bars -->
+                    <div class="space-y-4" id="distributionBarsContainer">
+                        <!-- Dynamic Distribution Bars Will Be Injected Here -->
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                    <span>마지막 업데이트</span>
+                    <span id="lastUpdatedTimestamp" class="font-mono text-slate-300">방금 전</span>
+                </div>
+            </div>
+
+            <!-- Main Trend Chart -->
+            <div class="glass-card rounded-2xl p-6 lg:col-span-2 flex flex-col justify-between">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2" id="chart1Heading">
+                            <i class="fas fa-chart-column text-blue-400"></i>
+                            항목별 수치 비교 및 분포
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5" id="chart1Subheading">카테고리 또는 항목별 데이터 수치 시각화</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select id="chart1MetricSelect" onchange="renderCharts()" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2 py-1 focus:outline-none">
+                            <!-- Dynamic numeric columns options -->
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Canvas Container -->
+                <div class="relative w-full h-64 sm:h-72">
+                    <canvas id="mainBarChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Secondary Visualizations Grid -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Pie / Doughnut Chart Card -->
+            <div class="glass-card rounded-2xl p-6 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2" id="chart2Heading">
+                            <i class="fas fa-chart-pie text-violet-400"></i>
+                            비중 & 비율 구성 분석
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">상위 항목의 점유율 분포</p>
+                    </div>
+                    <select id="chart2CategorySelect" onchange="renderCharts()" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2 py-1 focus:outline-none">
+                        <!-- Dynamic categorical columns options -->
+                    </select>
+                </div>
+                <div class="relative w-full h-64 flex items-center justify-center">
+                    <canvas id="shareDoughnutChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Line Trend Chart Card -->
+            <div class="glass-card rounded-2xl p-6 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2" id="chart3Heading">
+                            <i class="fas fa-chart-line text-emerald-400"></i>
+                            추이 & 변화 분석
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">순서/시간 경과에 따른 수치 흐름</p>
+                    </div>
+                </div>
+                <div class="relative w-full h-64">
+                    <canvas id="lineTrendChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 9 Items Individual Visualizations Grid Section -->
+        <section class="glass-card rounded-2xl p-6 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+                <div>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fas fa-th-large text-cyan-400"></i>
+                        9개 주요 항목별 개별 시각화 그래프
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">수집된 데이터 중 상위 9개 항목의 세부 지표, 점유율 및 개별 추이 그래프입니다.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400 font-medium"><i class="fas fa-sliders text-xs mr-1"></i>그래프 유형:</span>
+                    <select id="itemGridChartType" onchange="renderItemGrid()" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500 font-medium">
+                        <option value="bar" selected>프로그레스 게이지</option>
+                        <option value="donut">원형 비율 차트</option>
+                        <option value="sparkline">개별 추이 선그래프</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 9 Items Multi-Card Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="itemGridContainer">
+                <!-- Dynamic 9 Item Mini Cards Injected via JS -->
+            </div>
+        </section>
+
+        <!-- Interactive Data Table Section -->
+        <section class="glass-card rounded-2xl p-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                <div>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fas fa-table text-indigo-400"></i>
+                        실시간 상세 데이터 테이블
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">구글 시트 원본 데이터를 실시간 조회 및 검색할 수 있습니다.</p>
+                </div>
+
+                <div class="flex items-center flex-wrap gap-2">
+                    <!-- Search Input -->
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="tableSearchInput" oninput="handleTableSearch()" placeholder="검색어 입력..." 
+                            class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:border-blue-500 w-44 sm:w-60">
+                    </div>
+
+                    <!-- Export CSV Button -->
+                    <button onclick="exportToCSV()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs transition-all flex items-center gap-1.5">
+                        <i class="fas fa-file-csv text-emerald-400"></i>
+                        <span>CSV 다운로드</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="overflow-x-auto rounded-xl border border-slate-800 max-h-96 overflow-y-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead class="bg-slate-800/90 sticky top-0 z-10 text-slate-300 font-semibold border-b border-slate-700" id="tableHeader">
+                        <!-- Dynamic Header Row -->
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60 text-slate-300 font-normal" id="tableBody">
+                        <!-- Dynamic Data Rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Footer & Pagination -->
+            <div class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+                <div id="tablePaginationInfo">
+                    0개 항목 중 0 - 0 표시
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button id="prevPageBtn" onclick="changePage(-1)" disabled class="p-1.5 px-3 rounded bg-slate-800 border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700">
+                        <i class="fas fa-chevron-left mr-1"></i> 이전
+                    </button>
+                    <span id="currentPageDisplay" class="font-medium text-slate-200 px-2">1 / 1</span>
+                    <button id="nextPageBtn" onclick="changePage(1)" disabled class="p-1.5 px-3 rounded bg-slate-800 border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700">
+                        다음 <i class="fas fa-chevron-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="glass-card rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-700 space-y-5 animate-in fade-in zoom-in duration-200">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-cog text-blue-400"></i>
+                    구글 시트 연동 설정
+                </h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">구글 시트 URL 또는 ID</label>
+                    <input type="text" id="sheetIdInput" placeholder="https://docs.google.com/spreadsheets/d/1-8zGVGD9o65MTQtJzwMZDRlkNocCi-ciYwGYPkozKG8/edit" 
+                        class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-blue-500 font-mono">
+                    <p class="text-slate-400 text-[11px] mt-1">
+                        공유 링크 전체를 붙여넣거나 스프레드시트 ID만 입력하셔도 됩니다.
+                    </p>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">시트 탭 이름 (선택사항)</label>
+                    <input type="text" id="sheetNameInput" placeholder="예: Sheet1 또는 시트1 (비워두면 첫 번째 탭)" 
+                        class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 space-y-1">
+                    <div class="font-semibold flex items-center gap-1.5">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        시트 접근 권한 필수 체크 사항
+                    </div>
+                    <p class="text-[11px] leading-relaxed opacity-90">
+                        구글 시트 상단 오른쪽 <b>[공유]</b> 버튼 &rarr; 일반 접근 권한을 <b>'링크가 있는 모든 사용자에게 공개 (보기 가능)'</b>로 설정하셔야 실시간 데이터를 연동할 수 있습니다.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="useDemoDataset()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs">
+                    데모 데이터 사용
+                </button>
+                <button onclick="saveSettings()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md shadow-blue-600/30">
+                    저장 및 연동하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-900/50 py-4 px-6 text-center text-xs text-slate-500">
+        <p>실시간 구글 시트 인포그래픽 대시보드 &bull; 수집 데이터 자동 감지 시각화 엔진</p>
+    </footer>
+
+    <script>
+        // Global Application State
+        let currentSheetId = '1-8zGVGD9o65MTQtJzwMZDRlkNocCi-ciYwGYPkozKG8';
+        let currentSheetName = '';
+        let refreshIntervalSeconds = 10;
+        let timerId = null;
+
+        // Raw and Filtered Data State
+        let rawHeaders = [];
+        let rawRows = [];
+        let filteredRows = [];
+        let currentPage = 1;
+        const pageSize = 8;
+
+        // Detected Column Types
+        let numericColIndices = [];
+        let stringColIndices = [];
+
+        // Chart Instances
+        let barChartInstance = null;
+        let doughnutChartInstance = null;
+        let lineChartInstance = null;
+        let itemGridChartInstances = [];
+
+        // Sample / Fallback Data in case the sheet is private or unaccessible
+        const SAMPLE_DATA = {
+            headers: ['프로젝트/품목', '분류', '목표 수량', '달성 수량', '달성률(%)', '담당 부서', '상태'],
+            rows: [
+                ['AI 대시보드 개발', 'IT/소프트웨어', 120, 115, 95.8, '개발 1팀', '진행중'],
+                ['구글 시트 자동화', '데이터 솔루션', 85, 85, 100.0, '데이터팀', '완료'],
+                ['클라우드 마이그레이션', '인프라', 50, 42, 84.0, '인프라팀', '진행중'],
+                ['고객 지원 시스템 개선', '서비스', 200, 180, 90.0, 'CS팀', '완료'],
+                ['보안 취약점 점검', '보안', 30, 30, 100.0, '보안팀', '완료'],
+                ['신규 모바일 앱 디자인', '디자인', 90, 65, 72.2, '디자인팀', '진행중'],
+                ['영업 CRM 파이프라인 구축', '영업', 150, 130, 86.7, '영업팀', '진행중'],
+                ['글로벌 마케팅 캠페인', '마케팅', 300, 290, 96.7, '마케팅팀', '완료'],
+                ['데이터베이스 최적화', 'IT/소프트웨어', 40, 38, 95.0, '개발 2팀', '완료'],
+                ['직원 역량 강화 교육', 'HR', 100, 92, 92.0, '인사팀', '완료']
+            ]
+        };
+
+        window.onload = function() {
+            // Parse Sheet ID from default or URL input
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('sheetId')) {
+                currentSheetId = urlParams.get('sheetId');
+            }
+            document.getElementById('sheetIdInput').value = currentSheetId;
+            document.getElementById('currentSheetIdDisplay').innerText = currentSheetId;
+
+            // Load Data
+            loadDashboardData();
+
+            // Set auto refresh interval
+            handleIntervalChange();
+        };
+
+        // Load data from Google Sheets via JSON Query API
+        async function loadDashboardData() {
+            const refreshIcon = document.getElementById('refreshIcon');
+            refreshIcon.classList.add('fa-spin');
+
+            try {
+                // Extract clean sheet ID if user pasted full URL
+                let cleanId = extractSheetId(currentSheetId);
+                document.getElementById('currentSheetIdDisplay').innerText = cleanId;
+
+                const url = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:json${currentSheetName ? `&sheet=${encodeURIComponent(currentSheetName)}` : ''}`;
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP 오류 (${response.status}) - 구글 시트 접근 실패`);
+                }
+
+                const text = await response.text();
+                
+                // Parse gviz JSON wrapper
+                const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
+                if (!jsonMatch) {
+                    throw new Error('올바른 구글 시트 데이터 형식이 아닙니다.');
+                }
+
+                const json = JSON.parse(jsonMatch[1]);
+
+                if (json.status === 'error') {
+                    throw new Error(json.errors[0]?.detailed_message || '구글 시트를 읽을 수 없습니다.');
+                }
+
+                // Extract column headers
+                const table = json.table;
+                let headers = table.cols.map((col, idx) => {
+                    return (col.label && col.label.trim() !== '') ? col.label.trim() : `컬럼 ${idx + 1}`;
+                });
+
+                // Extract data rows
+                let rows = table.rows.map(r => {
+                    return r.c.map(cell => {
+                        if (!cell) return '';
+                        if (cell.v !== undefined && cell.v !== null) return cell.v;
+                        return cell.f || '';
+                    });
+                });
+
+                // Check if first row is header if cols labels were blank
+                if (table.cols.every(c => !c.label || c.label.trim() === '') && rows.length > 0) {
+                    headers = rows[0].map((v, i) => String(v) || `컬럼 ${i + 1}`);
+                    rows = rows.slice(1);
+                }
+
+                if (rows.length === 0) {
+                    showStatusAlert('warning', '데이터 없음', '구글 시트에 행 데이터가 비어있습니다.');
+                } else {
+                    showStatusAlert('success', '연동 성공', `구글 시트 실시간 연동 완료 (${rows.length}개 행 수집됨)`);
+                }
+
+                rawHeaders = headers;
+                rawRows = rows;
+                processAndRenderDashboard();
+
+            } catch (err) {
+                console.warn('Google Sheet Fetch Failed:', err);
+                showStatusAlert('error', '구글 시트 연동 실패 (샘플 데이터 모드 작동)', 
+                    `시트가 '링크가 있는 모든 사용자 공개'로 설정되어 있는지 확인하세요. (${err.message})`);
+                
+                // Fallback to sample dataset
+                rawHeaders = SAMPLE_DATA.headers;
+                rawRows = SAMPLE_DATA.rows;
+                processAndRenderDashboard();
+            } finally {
+                refreshIcon.classList.remove('fa-spin');
+                document.getElementById('lastUpdatedTimestamp').innerText = new Date().toLocaleTimeString('ko-KR');
+            }
+        }
+
+        // Extract ID from full URL or return ID directly
+        function extractSheetId(input) {
+            if (!input) return '1-8zGVGD9o65MTQtJzwMZDRlkNocCi-ciYwGYPkozKG8';
+            const match = input.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            return match ? match[1] : input.trim();
+        }
+
+        function processAndRenderDashboard() {
+            filteredRows = [...rawRows];
+            currentPage = 1;
+
+            // Detect Numeric vs String Columns
+            numericColIndices = [];
+            stringColIndices = [];
+
+            if (rawHeaders.length > 0 && rawRows.length > 0) {
+                for (let colIdx = 0; colIdx < rawHeaders.length; colIdx++) {
+                    let numericCount = 0;
+                    let totalCount = 0;
+
+                    for (let rowIdx = 0; rowIdx < rawRows.length; rowIdx++) {
+                        const val = rawRows[rowIdx][colIdx];
+                        if (val !== null && val !== '' && val !== undefined) {
+                            totalCount++;
+                            const num = Number(val);
+                            if (!isNaN(num)) numericCount++;
+                        }
+                    }
+
+                    if (totalCount > 0 && (numericCount / totalCount) >= 0.6) {
+                        numericColIndices.push(colIdx);
+                    } else {
+                        stringColIndices.push(colIdx);
+                    }
+                }
+            }
+
+            // Populate Chart Metric Selector Options
+            populateSelectOptions();
+
+            // Render Components
+            renderKPIs();
+            renderInfographicSummary();
+            renderCharts();
+            renderItemGrid();
+            renderTable();
+        }
+
+        function populateSelectOptions() {
+            const chart1Select = document.getElementById('chart1MetricSelect');
+            chart1Select.innerHTML = '';
+
+            numericColIndices.forEach(idx => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.innerText = rawHeaders[idx];
+                chart1Select.appendChild(opt);
+            });
+
+            if (numericColIndices.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = -1;
+                opt.innerText = '수치 데이터 없음';
+                chart1Select.appendChild(opt);
+            }
+
+            const chart2Select = document.getElementById('chart2CategorySelect');
+            chart2Select.innerHTML = '';
+
+            stringColIndices.forEach(idx => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.innerText = rawHeaders[idx];
+                chart2Select.appendChild(opt);
+            });
+
+            if (stringColIndices.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = 0;
+                opt.innerText = rawHeaders[0] || '카테고리';
+                chart2Select.appendChild(opt);
+            }
+        }
+
+        function renderKPIs() {
+            // Total Records KPI
+            document.getElementById('kpiTotalRecords').innerText = rawRows.length.toLocaleString();
+            document.getElementById('kpiRecordsSub').innerText = `${rawHeaders.length}개 항목 열`;
+
+            // Metric 1: Total Sum of First Numeric Column
+            if (numericColIndices.length > 0) {
+                const primaryColIdx = numericColIndices[0];
+                const colName = rawHeaders[primaryColIdx];
+                let sum = 0;
+
+                rawRows.forEach(r => {
+                    const val = Number(r[primaryColIdx]);
+                    if (!isNaN(val)) sum += val;
+                });
+
+                document.getElementById('kpiMetric1Title').innerText = `${colName} 총합`;
+                document.getElementById('kpiMetric1Value').innerText = formatNumber(sum);
+                document.getElementById('kpiMetric1Sub').innerText = `열 기준 누적 계산치`;
+            } else {
+                document.getElementById('kpiMetric1Title').innerText = '주요 지표 합계';
+                document.getElementById('kpiMetric1Value').innerText = 'N/A';
+            }
+
+            // Metric 2: Average of Second or First Numeric Column
+            if (numericColIndices.length > 0) {
+                const secColIdx = numericColIndices[1] !== undefined ? numericColIndices[1] : numericColIndices[0];
+                const colName = rawHeaders[secColIdx];
+                let sum = 0;
+                let count = 0;
+
+                rawRows.forEach(r => {
+                    const val = Number(r[secColIdx]);
+                    if (!isNaN(val)) {
+                        sum += val;
+                        count++;
+                    }
+                });
+
+                const avg = count > 0 ? (sum / count) : 0;
+                document.getElementById('kpiMetric2Title').innerText = `${colName} 평균`;
+                document.getElementById('kpiMetric2Value').innerText = avg.toLocaleString(undefined, { maximumFractionDigits: 1 });
+                document.getElementById('kpiMetric2Sub').innerText = `총 ${count}개 데이터 산출`;
+            } else {
+                document.getElementById('kpiMetric2Title').innerText = '평균 지표';
+                document.getElementById('kpiMetric2Value').innerText = 'N/A';
+            }
+
+            // Top Category KPI
+            if (stringColIndices.length > 0) {
+                const catIdx = stringColIndices[0];
+                const counts = {};
+
+                rawRows.forEach(r => {
+                    const cat = String(r[catIdx] || '기타').trim();
+                    if (cat) counts[cat] = (counts[cat] || 0) + 1;
+                });
+
+                let topCat = '-';
+                let maxCount = 0;
+
+                Object.keys(counts).forEach(c => {
+                    if (counts[c] > maxCount) {
+                        maxCount = counts[c];
+                        topCat = c;
+                    }
+                });
+
+                document.getElementById('kpiTopCategoryTitle').innerText = `${rawHeaders[catIdx]} 최다 항목`;
+                document.getElementById('kpiTopCategoryValue').innerText = topCat;
+                document.getElementById('kpiTopCategoryCount').innerText = `${maxCount}건`;
+                document.getElementById('kpiTopCategorySub').innerText = `전체의 ${Math.round((maxCount/rawRows.length)*100 || 0)}% 비중`;
+            }
+        }
+
+        function renderInfographicSummary() {
+            document.getElementById('dataColumnsCount').innerText = `${rawHeaders.length}개 항목 열`;
+
+            const container = document.getElementById('distributionBarsContainer');
+            container.innerHTML = '';
+
+            // Calculate top 3 categories from primary string column
+            if (stringColIndices.length > 0) {
+                const catIdx = stringColIndices[0];
+                const colName = rawHeaders[catIdx];
+                const counts = {};
+
+                rawRows.forEach(r => {
+                    const val = String(r[catIdx] || '기타').trim();
+                    if (val) counts[val] = (counts[val] || 0) + 1;
+                });
+
+                const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+                const total = rawRows.length || 1;
+
+                document.getElementById('infographicSummaryText').innerText = 
+                    `데이터는 총 ${rawRows.length}개의 레코드로 구성되어 있으며, '${colName}' 항목을 기준으로 분석 시 ${sorted[0]?.[0] || '주요 카테고리'}가 가장 높은 점유율을 기록하고 있습니다.`;
+
+                const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-emerald-500'];
+
+                sorted.forEach(([label, count], index) => {
+                    const percentage = Math.round((count / total) * 100);
+                    const itemHtml = `
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="font-medium text-slate-200">${label}</span>
+                                <span class="text-slate-400 font-mono">${count}건 (${percentage}%)</span>
+                            </div>
+                            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                                <div class="${colors[index % colors.length]} h-2 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += itemHtml;
+                });
+            } else {
+                container.innerHTML = `<p class="text-xs text-slate-400">시각화 가능한 카테고리 열이 부족합니다.</p>`;
+            }
+        }
+
+        function renderCharts() {
+            if (rawRows.length === 0) return;
+
+            // 1. Main Bar Chart Render
+            const metricSelectVal = Number(document.getElementById('chart1MetricSelect').value);
+            const numIdx = metricSelectVal >= 0 ? metricSelectVal : (numericColIndices[0] || 0);
+            const labelIdx = stringColIndices[0] !== undefined ? stringColIndices[0] : 0;
+
+            const barLabels = rawRows.slice(0, 12).map(r => String(r[labelIdx] || ''));
+            const barData = rawRows.slice(0, 12).map(r => Number(r[numIdx]) || 0);
+
+            const metricName = rawHeaders[numIdx] || '수치';
+            document.getElementById('chart1Heading').innerHTML = `<i class="fas fa-chart-column text-blue-400"></i> ${metricName} 항목별 데이터`;
+
+            const barCtx = document.getElementById('mainBarChart').getContext('2d');
+            if (barChartInstance) barChartInstance.destroy();
+
+            barChartInstance = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: barLabels,
+                    datasets: [{
+                        label: metricName,
+                        data: barData,
+                        backgroundColor: 'rgba(59, 130, 246, 0.75)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1.5,
+                        borderRadius: 6,
+                        hoverBackgroundColor: 'rgba(99, 102, 241, 0.9)',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1e293b',
+                            titleColor: '#f8fafc',
+                            bodyColor: '#cbd5e1',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+
+            // 2. Share Doughnut Chart Render
+            const catSelectVal = Number(document.getElementById('chart2CategorySelect').value);
+            const catIdx = catSelectVal >= 0 ? catSelectVal : (stringColIndices[0] || 0);
+
+            const catCounts = {};
+            rawRows.forEach(r => {
+                const val = String(r[catIdx] || '기타').trim();
+                if (val) catCounts[val] = (catCounts[val] || 0) + 1;
+            });
+
+            const topCatPairs = Object.entries(catCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+            const doughnutLabels = topCatPairs.map(p => p[0]);
+            const doughnutData = topCatPairs.map(p => p[1]);
+
+            const doughnutCtx = document.getElementById('shareDoughnutChart').getContext('2d');
+            if (doughnutChartInstance) doughnutChartInstance.destroy();
+
+            doughnutChartInstance = new Chart(doughnutCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: doughnutLabels,
+                    datasets: [{
+                        data: doughnutData,
+                        backgroundColor: [
+                            '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#1e293b'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#cbd5e1', font: { size: 11 }, boxWidth: 12 }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+
+            // 3. Line Trend Chart Render
+            const lineCtx = document.getElementById('lineTrendChart').getContext('2d');
+            if (lineChartInstance) lineChartInstance.destroy();
+
+            const lineLabels = rawRows.slice(0, 15).map((r, idx) => `item #${idx + 1}`);
+            const lineData = rawRows.slice(0, 15).map(r => Number(r[numIdx]) || 0);
+
+            lineChartInstance = new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: lineLabels,
+                    datasets: [{
+                        label: metricName,
+                        data: lineData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#10b981',
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render 9 Individual Item Mini-Chart Grid
+        function renderItemGrid() {
+            const container = document.getElementById('itemGridContainer');
+            if (!container) return;
+
+            // Destroy previous mini chart instances
+            itemGridChartInstances.forEach(inst => { if (inst) inst.destroy(); });
+            itemGridChartInstances = [];
+
+            container.innerHTML = '';
+
+            if (rawRows.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center text-slate-400 py-6">표시할 데이터가 없습니다.</div>`;
+                return;
+            }
+
+            // Extract up to 9 items
+            const top9Rows = rawRows.slice(0, 9);
+            const chartType = document.getElementById('itemGridChartType')?.value || 'bar';
+
+            const nameIdx = stringColIndices[0] !== undefined ? stringColIndices[0] : 0;
+            const primaryNumIdx = numericColIndices[0] !== undefined ? numericColIndices[0] : 1;
+            const targetNumIdx = numericColIndices[1] !== undefined ? numericColIndices[1] : primaryNumIdx;
+
+            // Calculate total sum for percentages
+            let totalSum = 0;
+            top9Rows.forEach(r => {
+                const val = Number(r[primaryNumIdx]);
+                if (!isNaN(val)) totalSum += val;
+            });
+            if (totalSum === 0) totalSum = 1;
+
+            const colorPalette = [
+                { main: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)', text: 'text-blue-400', border: 'border-blue-500/30' },
+                { main: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+                { main: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)', text: 'text-violet-400', border: 'border-violet-500/30' },
+                { main: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', text: 'text-amber-400', border: 'border-amber-500/30' },
+                { main: '#ec4899', bg: 'rgba(236, 72, 153, 0.15)', text: 'text-pink-400', border: 'border-pink-500/30' },
+                { main: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)', text: 'text-cyan-400', border: 'border-cyan-500/30' },
+                { main: '#6366f1', bg: 'rgba(99, 102, 241, 0.15)', text: 'text-indigo-400', border: 'border-indigo-500/30' },
+                { main: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', text: 'text-orange-400', border: 'border-orange-500/30' },
+                { main: '#14b8a6', bg: 'rgba(20, 184, 166, 0.15)', text: 'text-teal-400', border: 'border-teal-500/30' }
+            ];
+
+            top9Rows.forEach((row, idx) => {
+                const itemName = String(row[nameIdx] || `항목 #${idx + 1}`);
+                const mainVal = Number(row[primaryNumIdx]) || 0;
+                const secVal = Number(row[targetNumIdx]) || 0;
+                const percentage = Math.min(Math.round((mainVal / totalSum) * 100), 100);
+
+                const color = colorPalette[idx % colorPalette.length];
+                const cardId = `itemCardCanvas_${idx}`;
+
+                const cardHtml = `
+                    <div class="glass-card-hover rounded-xl p-4 bg-slate-800/60 border ${color.border} flex flex-col justify-between space-y-3 relative overflow-hidden group">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2 truncate">
+                                <span class="w-6 h-6 rounded-lg ${color.bg} ${color.text} flex items-center justify-center text-xs font-bold font-mono">
+                                    0${idx + 1}
+                                </span>
+                                <h4 class="text-xs font-bold text-white truncate" title="${itemName}">${itemName}</h4>
+                            </div>
+                            <span class="text-[11px] font-mono font-semibold ${color.text}">${percentage}% 점유</span>
+                        </div>
+
+                        <div class="flex items-baseline justify-between pt-1">
+                            <div>
+                                <span class="text-xl font-extrabold text-white tracking-tight">${formatNumber(mainVal)}</span>
+                                <span class="text-[10px] text-slate-400 block">${rawHeaders[primaryNumIdx] || '수치'}</span>
+                            </div>
+                            ${secVal ? `
+                            <div class="text-right">
+                                <span class="text-xs font-semibold text-slate-300 font-mono">${formatNumber(secVal)}</span>
+                                <span class="text-[10px] text-slate-400 block">${rawHeaders[targetNumIdx] || '보조'}</span>
+                            </div>` : ''}
+                        </div>
+
+                        <!-- Mini Canvas Graph Container -->
+                        <div class="w-full h-20 relative pt-1">
+                            <canvas id="${cardId}"></canvas>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHtml;
+            });
+
+            // Render Chart.js mini charts for each card after injection
+            top9Rows.forEach((row, idx) => {
+                const cardId = `itemCardCanvas_${idx}`;
+                const canvas = document.getElementById(cardId);
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d');
+                const color = colorPalette[idx % colorPalette.length];
+                const mainVal = Number(row[primaryNumIdx]) || 0;
+                const secVal = Number(row[targetNumIdx]) || 0;
+
+                let miniChart;
+
+                if (chartType === 'donut') {
+                    miniChart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: [itemName(row, nameIdx), '기타'],
+                            datasets: [{
+                                data: [mainVal, Math.max(totalSum - mainVal, 1)],
+                                backgroundColor: [color.main, 'rgba(51, 65, 85, 0.4)'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false }, tooltip: { enabled: true } },
+                            cutout: '72%'
+                        }
+                    });
+                } else if (chartType === 'sparkline') {
+                    // Generate pseudo trend curve ending at mainVal
+                    const sparkData = [
+                        Math.round(mainVal * 0.5),
+                        Math.round(mainVal * 0.7),
+                        Math.round(mainVal * 0.6),
+                        Math.round(mainVal * 0.9),
+                        Math.round(mainVal * 0.85),
+                        mainVal
+                    ];
+                    miniChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['1단계', '2단계', '3단계', '4단계', '5단계', '최종'],
+                            datasets: [{
+                                data: sparkData,
+                                borderColor: color.main,
+                                backgroundColor: color.bg,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 2,
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { display: false },
+                                y: { display: false }
+                            }
+                        }
+                    });
+                } else {
+                    // Horizontal Bar/Progress Chart
+                    miniChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: [itemName(row, nameIdx)],
+                            datasets: [
+                                {
+                                    label: rawHeaders[primaryNumIdx] || '값',
+                                    data: [mainVal],
+                                    backgroundColor: color.main,
+                                    borderRadius: 4
+                                },
+                                ...(secVal ? [{
+                                    label: rawHeaders[targetNumIdx] || '목표',
+                                    data: [secVal],
+                                    backgroundColor: 'rgba(148, 163, 184, 0.3)',
+                                    borderRadius: 4
+                                }] : [])
+                            ]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { display: false },
+                                y: { display: false }
+                            }
+                        }
+                    });
+                }
+
+                itemGridChartInstances.push(miniChart);
+            });
+        }
+
+        // Helper function for row item name
+        function itemName(row, idx) {
+            return String(row[idx] || '항목');
+        }
+
+        function renderTable() {
+            const tableHeader = document.getElementById('tableHeader');
+            const tableBody = document.getElementById('tableBody');
+
+            // Render Header
+            let headerHtml = '<tr>';
+            rawHeaders.forEach((h, idx) => {
+                headerHtml += `<th class="p-3 font-semibold text-slate-300 border-b border-slate-700">${h}</th>`;
+            });
+            headerHtml += '</tr>';
+            tableHeader.innerHTML = headerHtml;
+
+            // Pagination calculation
+            const total = filteredRows.length;
+            const totalPages = Math.ceil(total / pageSize) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, total);
+            const pageRows = filteredRows.slice(startIdx, endIdx);
+
+            // Render Body Rows
+            tableBody.innerHTML = '';
+            if (pageRows.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="${rawHeaders.length || 1}" class="p-6 text-center text-slate-400">검색 조건에 맞는 데이터가 없습니다.</td></tr>`;
+            } else {
+                pageRows.forEach(row => {
+                    let rowHtml = '<tr class="hover:bg-slate-800/40 transition-colors">';
+                    row.forEach((cell, idx) => {
+                        const strVal = String(cell !== undefined && cell !== null ? cell : '');
+                        
+                        // Badge Styling for numeric/status values
+                        let cellContent = strVal;
+                        if (strVal === '완료') {
+                            cellContent = `<span class="px-2 py-0.5 rounded-md text-[11px] bg-emerald-500/15 text-emerald-400 font-medium">완료</span>`;
+                        } else if (strVal === '진행중') {
+                            cellContent = `<span class="px-2 py-0.5 rounded-md text-[11px] bg-blue-500/15 text-blue-400 font-medium">진행중</span>`;
+                        }
+
+                        rowHtml += `<td class="p-3 text-slate-300 border-b border-slate-800/60 whitespace-nowrap">${cellContent}</td>`;
+                    });
+                    rowHtml += '</tr>';
+                    tableBody.innerHTML += rowHtml;
+                });
+            }
+
+            // Update Pagination Controls
+            document.getElementById('tablePaginationInfo').innerText = `${total}개 항목 중 ${total > 0 ? startIdx + 1 : 0} - ${endIdx} 표시`;
+            document.getElementById('currentPageDisplay').innerText = `${currentPage} / ${totalPages}`;
+            document.getElementById('prevPageBtn').disabled = (currentPage <= 1);
+            document.getElementById('nextPageBtn').disabled = (currentPage >= totalPages);
+        }
+
+        function handleTableSearch() {
+            const query = document.getElementById('tableSearchInput').value.toLowerCase().trim();
+            if (!query) {
+                filteredRows = [...rawRows];
+            } else {
+                filteredRows = rawRows.filter(row => {
+                    return row.some(cell => String(cell).toLowerCase().includes(query));
+                });
+            }
+            currentPage = 1;
+            renderTable();
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            renderTable();
+        }
+
+        function exportToCSV() {
+            if (rawHeaders.length === 0) return;
+
+            let csvContent = '\uFEFF'; // UTF-8 BOM
+            csvContent += rawHeaders.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
+
+            filteredRows.forEach(row => {
+                const line = row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',');
+                csvContent += line + '\n';
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `google_sheet_export_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function handleIntervalChange() {
+            const val = Number(document.getElementById('refreshIntervalSelect').value);
+            if (timerId) clearInterval(timerId);
+
+            if (val > 0) {
+                refreshIntervalSeconds = val;
+                timerId = setInterval(() => {
+                    loadDashboardData();
+                }, refreshIntervalSeconds * 1000);
+            }
+        }
+
+        function openSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            const rawInput = document.getElementById('sheetIdInput').value;
+            currentSheetId = extractSheetId(rawInput);
+            currentSheetName = document.getElementById('sheetNameInput').value.trim();
+
+            closeSettingsModal();
+            loadDashboardData();
+        }
+
+        function useDemoDataset() {
+            closeSettingsModal();
+            showStatusAlert('info', '데모 샘플 데이터 모드', '샘플 시트 데이터로 대시보드를 전환합니다.');
+            rawHeaders = SAMPLE_DATA.headers;
+            rawRows = SAMPLE_DATA.rows;
+            processAndRenderDashboard();
+        }
+
+        function showStatusAlert(type, title, message) {
+            const alertBox = document.getElementById('statusAlert');
+            const alertTitle = document.getElementById('statusAlertTitle');
+            const alertMsg = document.getElementById('statusAlertMessage');
+            const alertIcon = document.getElementById('statusAlertIcon');
+
+            alertBox.classList.remove('hidden', 'bg-blue-500/10', 'border-blue-500/20', 'text-blue-300',
+                'bg-emerald-500/10', 'border-emerald-500/20', 'text-emerald-300',
+                'bg-amber-500/10', 'border-amber-500/20', 'text-amber-300',
+                'bg-rose-500/10', 'border-rose-500/20', 'text-rose-300');
+
+            if (type === 'error') {
+                alertBox.classList.add('bg-rose-500/10', 'border-rose-500/20', 'text-rose-300');
+                alertIcon.className = 'fas fa-exclamation-circle text-lg text-rose-400';
+            } else if (type === 'warning') {
+                alertBox.classList.add('bg-amber-500/10', 'border-amber-500/20', 'text-amber-300');
+                alertIcon.className = 'fas fa-exclamation-triangle text-lg text-amber-400';
+            } else if (type === 'success') {
+                alertBox.classList.add('bg-emerald-500/10', 'border-emerald-500/20', 'text-emerald-300');
+                alertIcon.className = 'fas fa-check-circle text-lg text-emerald-400';
+            } else {
+                alertBox.classList.add('bg-blue-500/10', 'border-blue-500/20', 'text-blue-300');
+                alertIcon.className = 'fas fa-info-circle text-lg text-blue-400';
+            }
+
+            alertTitle.innerText = title;
+            alertMsg.innerText = message;
+        }
+
+        function closeStatusAlert() {
+            document.getElementById('statusAlert').classList.add('hidden');
+        }
+
+        // Helper formatting functions
+        function formatNumber(num) {
+            if (num >= 100000000) {
+                return (num / 100000000).toFixed(1) + '억';
+            } else if (num >= 10000) {
+                return (num / 10000).toFixed(1) + '만';
+            }
+            return num.toLocaleString();
+        }
+    </script>
+</body>
+</html>
