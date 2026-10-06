@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4P 마케팅 믹스 & 실시간 인포그래픽 대시보드 Pro</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Marked.js for Markdown conversion -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card-hover:hover {
+            transform: translateY(-3px);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 12px 24px -10px rgba(59, 130, 246, 0.25);
+        }
+
+        .input-dark {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #f8fafc;
+            transition: all 0.2s ease;
+        }
+        .input-dark:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .pulse-indicator {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            animation: pulse-ring 2s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+        @keyframes pulse-ring {
+            to {
+                box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+            }
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background-color: #ffffff; color: #000000; }
+            .glass-card { background: #ffffff; border: 1px solid #ccc; color: #000; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+    <header class="sticky top-0 z-40 glass-card border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 lg:px-8 py-3 no-print">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            <!-- Logo & Navigation Tabs -->
+            <div class="flex items-center space-x-4">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
+                    <i class="fas fa-chart-pie text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white tracking-tight">4P 마케팅 & 실시간 인포그래픽 대시보드</h1>
+                    <p class="text-xs text-slate-400">데이터 시각화 대시보드 및 4P 전략서 통합 관리 시스템</p>
+                </div>
+            </div>
+
+            <!-- View Switcher Tabs -->
+            <div class="flex items-center bg-slate-950/70 p-1 rounded-xl border border-slate-800/80">
+                <button id="tab-dashboard-btn" onclick="switchTab('dashboard')" class="px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 bg-blue-600 text-white shadow-md">
+                    <i class="fas fa-chart-line"></i>
+                    <span>실시간 대시보드</span>
+                </button>
+                <button id="tab-strategy-btn" onclick="switchTab('strategy')" class="px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 text-slate-400 hover:text-white">
+                    <i class="fas fa-pen-to-square"></i>
+                    <span>4P 마케팅 전략 작성</span>
+                </button>
+            </div>
+
+            <!-- Controls & Quick Actions -->
+            <div class="flex items-center flex-wrap gap-2 text-sm justify-end">
+                <div class="flex items-center bg-slate-800/80 rounded-lg p-1 border border-slate-700/60">
+                    <i class="fas fa-clock text-slate-400 px-2 text-xs"></i>
+                    <select id="refreshIntervalSelect" onchange="handleIntervalChange()" class="bg-transparent text-xs text-slate-200 focus:outline-none pr-2 cursor-pointer font-medium">
+                        <option value="0" class="bg-slate-800 text-slate-200">수동 동기화</option>
+                        <option value="10" selected class="bg-slate-800 text-slate-200">10초 자동</option>
+                        <option value="30" class="bg-slate-800 text-slate-200">30초 자동</option>
+                    </select>
+                </div>
+
+                <button onclick="loadDashboardData()" id="refreshBtn" title="새로고침" 
+                    class="p-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all flex items-center gap-1.5 text-xs font-semibold shadow-md shadow-blue-600/20 active:scale-95">
+                    <i class="fas fa-sync-alt text-xs" id="refreshIcon"></i>
+                    <span class="hidden sm:inline">새로고침</span>
+                </button>
+
+                <button onclick="openSettingsModal()" class="p-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all flex items-center gap-1.5 text-xs font-medium">
+                    <i class="fas fa-sliders-h"></i>
+                    <span class="hidden sm:inline">구글시트 연동</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- TAB 1: DASHBOARD VIEW -->
+        <div id="view-dashboard" class="space-y-6">
+            
+            <!-- Status Alert Banner -->
+            <div id="statusAlert" class="hidden rounded-xl p-4 border transition-all text-sm flex items-start justify-between gap-3">
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-info-circle text-lg mt-0.5" id="statusAlertIcon"></i>
+                    <div>
+                        <h4 class="font-semibold" id="statusAlertTitle">알림</h4>
+                        <p class="text-xs opacity-90 mt-0.5" id="statusAlertMessage"></p>
+                    </div>
+                </div>
+                <button onclick="closeStatusAlert()" class="opacity-70 hover:opacity-100 p-1">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- KPI 1 -->
+                <div class="glass-card glass-card-hover rounded-2xl p-5 relative overflow-hidden group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">전체 레코드 데이터</span>
+                        <div class="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center">
+                            <i class="fas fa-database text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-baseline justify-between">
+                        <span class="text-3xl font-extrabold text-white tracking-tight" id="kpiTotalRecords">0</span>
+                        <span class="text-xs text-blue-400 font-medium">행 데이터</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                        <span class="text-emerald-400 font-medium" id="kpiRecordsSub">실시간 동기화됨</span>
+                    </p>
+                </div>
+
+                <!-- KPI 2 -->
+                <div class="glass-card glass-card-hover rounded-2xl p-5 relative overflow-hidden group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider" id="kpiMetric1Title">주요 수치 합계</span>
+                        <div class="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                            <i class="fas fa-calculator text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-baseline justify-between">
+                        <span class="text-3xl font-extrabold text-white tracking-tight" id="kpiMetric1Value">0</span>
+                        <span class="text-xs text-emerald-400 font-medium">누적 총합</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2 truncate" id="kpiMetric1Sub">자동 수치 집계</p>
+                </div>
+
+                <!-- KPI 3 -->
+                <div class="glass-card glass-card-hover rounded-2xl p-5 relative overflow-hidden group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">4P 전략 완성도</span>
+                        <div class="w-9 h-9 rounded-xl bg-violet-500/15 text-violet-400 flex items-center justify-center">
+                            <i class="fas fa-list-check text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-baseline justify-between">
+                        <span class="text-3xl font-extrabold text-white tracking-tight" id="kpi4pPercent">0%</span>
+                        <span class="text-xs text-violet-400 font-medium" id="kpi4pStatus">작성 필요</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2 truncate">16개 세부 항목 입력 현황</p>
+                </div>
+
+                <!-- KPI 4 -->
+                <div class="glass-card glass-card-hover rounded-2xl p-5 relative overflow-hidden group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider" id="kpiTopCategoryTitle">최다 항목 카테고리</span>
+                        <div class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
+                            <i class="fas fa-trophy text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-baseline justify-between">
+                        <span class="text-2xl font-bold text-white truncate max-w-[160px]" id="kpiTopCategoryValue">-</span>
+                        <span class="text-xs text-amber-400 font-semibold" id="kpiTopCategoryCount">0건</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2 truncate" id="kpiTopCategorySub">가장 비중이 높은 분류</p>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Quick Summary Card -->
+                <div class="glass-card rounded-2xl p-6 lg:col-span-1 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fas fa-lightbulb text-amber-400"></i> 데이터 핵심 요약
+                            </h3>
+                            <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-mono border border-slate-700" id="dataColumnsCount">0개 열</span>
+                        </div>
+                        <p class="text-xs text-slate-300 leading-relaxed mb-6" id="infographicSummaryText">
+                            구글 시트 수집 데이터에 대한 주요 분포 및 트렌드 분석 요약입니다.
+                        </p>
+                        <div class="space-y-4" id="distributionBarsContainer">
+                            <!-- Injected via JS -->
+                        </div>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                        <span>최종 업데이트</span>
+                        <span id="lastUpdatedTimestamp" class="font-mono text-slate-300">방금 전</span>
+                    </div>
+                </div>
+
+                <!-- Main Column Bar Chart -->
+                <div class="glass-card rounded-2xl p-6 lg:col-span-2 flex flex-col justify-between">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                        <div>
+                            <h3 class="text-base font-bold text-white flex items-center gap-2" id="chart1Heading">
+                                <i class="fas fa-chart-column text-blue-400"></i> 항목별 수치 비교 및 분포
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-0.5">카테고리 및 데이터 수치 시각화</p>
+                        </div>
+                        <select id="chart1MetricSelect" onchange="renderCharts()" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2 py-1 focus:outline-none">
+                        </select>
+                    </div>
+                    <div class="relative w-full h-64 sm:h-72">
+                        <canvas id="mainBarChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Doughnut Chart -->
+                <div class="glass-card rounded-2xl p-6 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fas fa-chart-pie text-violet-400"></i> 비중 및 점유율 분포
+                        </h3>
+                        <select id="chart2CategorySelect" onchange="renderCharts()" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2 py-1 focus:outline-none">
+                        </select>
+                    </div>
+                    <div class="relative w-full h-64 flex items-center justify-center">
+                        <canvas id="shareDoughnutChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Line Chart -->
+                <div class="glass-card rounded-2xl p-6 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fas fa-chart-line text-emerald-400"></i> 데이터 변화 추이
+                        </h3>
+                    </div>
+                    <div class="relative w-full h-64">
+                        <canvas id="lineTrendChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section class="glass-card rounded-2xl p-6 space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fas fa-th-large text-cyan-400"></i> 9개 주요 항목별 개별 시각화
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">상위 9개 항목의 세부 지표 및 개별 그래프입니다.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400 font-medium">그래프 타입:</span>
+                        <select id="itemGridChartType" onchange="renderItemGrid()" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none">
+                            <option value="bar" selected>막대 프로그레스</option>
+                            <option value="donut">원형 비율 차트</option>
+                            <option value="sparkline">라인 스파크라인</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="itemGridContainer">
+                    <!-- Dynamic cards injected via JS -->
+                </div>
+            </section>
+
+            <section class="glass-card rounded-2xl p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fas fa-table text-indigo-400"></i> 실시간 원본 데이터 테이블
+                        </h3>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="tableSearchInput" oninput="handleTableSearch()" placeholder="검색어 입력..." 
+                                class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 focus:outline-none w-44 sm:w-60">
+                        </div>
+                        <button onclick="exportToCSV()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs transition-all flex items-center gap-1.5">
+                            <i class="fas fa-file-csv text-emerald-400"></i> CSV 저장
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-800 max-h-96 overflow-y-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-800/90 sticky top-0 z-10 text-slate-300 font-semibold border-b border-slate-700" id="tableHeader">
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60 text-slate-300" id="tableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+                    <div id="tablePaginationInfo">0개 중 0 - 0 표시</div>
+                    <div class="flex items-center space-x-2">
+                        <button id="prevPageBtn" onclick="changePage(-1)" disabled class="p-1.5 px-3 rounded bg-slate-800 border border-slate-700 disabled:opacity-40">이전</button>
+                        <span id="currentPageDisplay" class="font-medium text-slate-200 px-2">1 / 1</span>
+                        <button id="nextPageBtn" onclick="changePage(1)" disabled class="p-1.5 px-3 rounded bg-slate-800 border border-slate-700 disabled:opacity-40">다음</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div id="view-strategy" class="hidden space-y-6">
+
+            <!-- Context Info Card -->
+            <section class="glass-card rounded-2xl p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 mb-4 gap-3">
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-folder-open text-blue-400"></i> 브랜드 및 전략 기본 정보
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <select id="preset-select" onchange="loadPreset(this.value)" class="text-xs bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none">
+                            <option value="">💡 업종별 프리셋 선택</option>
+                            <option value="saas">💻 B2B SaaS 소프트웨어</option>
+                            <option value="d2c">☕ 프리미엄 스페셜티 커피</option>
+                            <option value="app">📱 헬스케어 피트니스 앱</option>
+                            <option value="eco">🌱 친환경 텀블러 브랜드</option>
+                        </select>
+                        <button onclick="requestClearAll()" class="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 px-3 py-1.5 rounded-lg font-medium">
+                            초기화
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">프로젝트 / 브랜드명</label>
+                        <input type="text" id="project-name" oninput="updateProgress()" class="input-dark w-full text-xs rounded-lg p-2.5" placeholder="예: 넥스트케어 (NextCare)">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">핵심 타겟 고객층 (Target Audience)</label>
+                        <input type="text" id="target-audience" oninput="updateProgress()" class="input-dark w-full text-xs rounded-lg p-2.5" placeholder="예: 2030 직장인">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">핵심 목표 (Goal / KPI)</label>
+                        <input type="text" id="strategy-goal" oninput="updateProgress()" class="input-dark w-full text-xs rounded-lg p-2.5" placeholder="예: 6개월 내 재구매율 30% 달성">
+                    </div>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                <!-- 1. PRODUCT -->
+                <div class="glass-card rounded-2xl overflow-hidden flex flex-col border border-slate-800">
+                    <div class="bg-gradient-to-r from-blue-900/80 to-slate-900 p-4 border-b border-blue-500/20 flex items-center justify-between">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-box-open text-blue-400"></i> 1. Product (제품 전략)
+                        </h3>
+                        <span class="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-mono border border-blue-500/30">P1</span>
+                    </div>
+                    <div class="p-5 space-y-4 text-xs">
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">핵심 가치 제안 및 차별화 (USP)</label>
+                            <textarea id="p-prod-core" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="독자 기술로 온도 유지, 경량화..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">주요 스펙 및 라인업 (Specifications)</label>
+                            <textarea id="p-prod-spec" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="500ml / 750ml 2종 라인업..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">패키징 및 브랜딩 (Packaging)</label>
+                            <textarea id="p-prod-package" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="Zero-Waste 종이 패키징..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">고객 서비스 & A/S (Warranty)</label>
+                            <textarea id="p-prod-service" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="구매 후 1년 내 무상 A/S..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. PRICE -->
+                <div class="glass-card rounded-2xl overflow-hidden flex flex-col border border-slate-800">
+                    <div class="bg-gradient-to-r from-emerald-900/80 to-slate-900 p-4 border-b border-emerald-500/20 flex items-center justify-between">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-tags text-emerald-400"></i> 2. Price (가격 전략)
+                        </h3>
+                        <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono border border-emerald-500/30">P2</span>
+                    </div>
+                    <div class="p-5 space-y-4 text-xs">
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">가격 책정 전략 (Pricing Strategy)</label>
+                            <textarea id="p-price-strategy" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="프리미엄 고가격 스키밍 전략..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">할인 및 결제 조건 (Discounts)</label>
+                            <textarea id="p-price-discount" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="신규 가입 쿠폰 15% 제공..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">원가 및 목표 마진율 (Margin)</label>
+                            <textarea id="p-price-margin" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="원가율 25%, 목표 영업이익률 40%..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">경쟁사 가격 비교 (Comparison)</label>
+                            <textarea id="p-price-compare" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="경쟁사 대비 높은 가성비 제시..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. PLACE -->
+                <div class="glass-card rounded-2xl overflow-hidden flex flex-col border border-slate-800">
+                    <div class="bg-gradient-to-r from-purple-900/80 to-slate-900 p-4 border-b border-purple-500/20 flex items-center justify-between">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-store text-purple-400"></i> 3. Place (유통/채널 전략)
+                        </h3>
+                        <span class="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-mono border border-purple-500/30">P3</span>
+                    </div>
+                    <div class="p-5 space-y-4 text-xs">
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">온라인 유통 채널 (Online)</label>
+                            <textarea id="p-place-online" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="공식 D2C 자사몰, 스마트스토어..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">오프라인 유통 채널 (Offline)</label>
+                            <textarea id="p-place-offline" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="백화점 팝업스토어, 편집숍..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">물류 및 배송 (Logistics)</label>
+                            <textarea id="p-place-logistics" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="당일 발송 및 풀필먼트 연동..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">파트너십 전략 (Partnerships)</label>
+                            <textarea id="p-place-partner" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="플랫폼 콜라보 유통 제휴..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. PROMOTION -->
+                <div class="glass-card rounded-2xl overflow-hidden flex flex-col border border-slate-800">
+                    <div class="bg-gradient-to-r from-amber-900/80 to-slate-900 p-4 border-b border-amber-500/20 flex items-center justify-between">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-bullhorn text-amber-400"></i> 4. Promotion (판촉/홍보 전략)
+                        </h3>
+                        <span class="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono border border-amber-500/30">P4</span>
+                    </div>
+                    <div class="p-5 space-y-4 text-xs">
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">디지털 광고 채널 (Advertising)</label>
+                            <textarea id="p-promo-ad" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="메타 숏폼 영상 광고, SA/DA..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">소셜 미디어 마케팅 (SNS)</label>
+                            <textarea id="p-promo-sns" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="인스타그램 릴스 및 챌린지..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">인플루언서 및 바이럴 (Influencers)</label>
+                            <textarea id="p-promo-influencer" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="유튜버 협찬 및 서포터즈..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-300 mb-1">프로모션 및 이벤트 (Events)</label>
+                            <textarea id="p-promo-event" rows="2" oninput="updateProgress()" class="input-dark w-full p-2.5 rounded-lg resize-y" placeholder="얼리버드 각인 서비스 무료..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <section class="glass-card rounded-2xl p-6 no-print">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-file-export text-blue-400"></i> 전략서 내보내기 및 공유
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">작성된 4P 전략서를 원하는 파일 형식으로 다운로드하세요.</p>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-wrap justify-end">
+                        <button onclick="openPreviewModal()" class="text-xs bg-slate-800 hover:bg-slate-700 text-white font-semibold px-4 py-2.5 rounded-xl border border-slate-700 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-eye"></i> 미리보기
+                        </button>
+                        <button onclick="exportHTML()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-blue-600/30">
+                            <i class="fa-solid fa-code"></i> HTML 다운로드
+                        </button>
+                        <button onclick="exportMarkdown()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-emerald-600/30">
+                            <i class="fa-brands fa-markdown text-sm"></i> 마크다운 다운로드
+                        </button>
+                        <button onclick="copyMarkdown()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-3 py-2.5 rounded-xl border border-slate-700 transition" title="복사">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                        <button onclick="window.print()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-3 py-2.5 rounded-xl border border-slate-700 transition" title="인쇄">
+                            <i class="fa-solid fa-print"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+    </main>
+
+    <!-- Google Sheets Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden no-print">
+        <div class="glass-card rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-700 space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-cog text-blue-400"></i> 구글 시트 연동 설정
+                </h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">구글 시트 URL 또는 ID</label>
+                    <input type="text" id="sheetIdInput" placeholder="https://docs.google.com/spreadsheets/d/1-8zGVGD9o65MTQtJzwMZDRlkNocCi-ciYwGYPkozKG8/edit" 
+                        class="w-full input-dark rounded-lg p-2.5 font-mono">
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">시트 탭 이름 (선택사항)</label>
+                    <input type="text" id="sheetNameInput" placeholder="예: Sheet1 또는 시트1" class="w-full input-dark rounded-lg p-2.5">
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button onclick="useDemoDataset()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs">
+                    데모 데이터 사용
+                </button>
+                <button onclick="saveSettings()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md">
+                    저장 및 연동
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy Preview Modal -->
+    <div id="preview-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4 no-print">
+        <div class="glass-card rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-700 overflow-hidden">
+            <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800">
+                <h3 class="text-base font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-file-contract text-blue-400"></i> 4P 마케팅 믹스 전략 보고서 미리보기
+                </h3>
+                <button onclick="closePreviewModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="modal-body-content" class="p-6 md:p-8 overflow-y-auto space-y-4 text-slate-200 bg-slate-900/50 text-xs">
+            </div>
+            <div class="bg-slate-900 px-6 py-3 border-t border-slate-800 flex justify-end gap-2">
+                <button onclick="closePreviewModal()" class="px-4 py-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-semibold">닫기</button>
+                <button onclick="exportHTML(); closePreviewModal();" class="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold">HTML 다운로드</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirmation Modal (Replacing confirm()) -->
+    <div id="confirmModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4 no-print">
+        <div class="glass-card rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-700 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-amber-400"></i> 입력값 초기화 확인
+            </h3>
+            <p class="text-xs text-slate-300 leading-relaxed">작성 중인 모든 4P 전략 및 설정 정보가 초기화됩니다. 계속 진행하시겠습니까?</p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeConfirmModal(false)" class="px-4 py-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg">취소</button>
+                <button onclick="closeConfirmModal(true)" class="px-4 py-2 text-xs bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-semibold">초기화 진행</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification (Replacing alert()) -->
+    <div id="toastNotification" class="fixed bottom-5 right-5 z-50 hidden bg-slate-800 text-white text-xs px-4 py-3 rounded-xl border border-slate-700 shadow-2xl flex items-center gap-2">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMessage">메시지</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-900/50 py-4 px-6 text-center text-xs text-slate-500 no-print">
+        <p>4P 마케팅 믹스 전략 기획서 & 실시간 인포그래픽 대시보드 Pro 통합 시스템</p>
+    </footer>
+
+    <script>
+        let currentSheetId = '1-8zGVGD9o65MTQtJzwMZDRlkNocCi-ciYwGYPkozKG8';
+        let currentSheetName = '';
+        let refreshIntervalSeconds = 10;
+        let timerId = null;
+
+        let rawHeaders = [];
+        let rawRows = [];
+        let filteredRows = [];
+        let currentPage = 1;
+        const pageSize = 8;
+
+        let numericColIndices = [];
+        let stringColIndices = [];
+
+        let barChartInstance = null;
+        let doughnutChartInstance = null;
+        let lineChartInstance = null;
+        let itemGridChartInstances = [];
+
+        const STORAGE_KEY = '4P_STRATEGY_DATA_PRO';
+
+        const fields = [
+            'project-name', 'target-audience', 'strategy-goal',
+            'p-prod-core', 'p-prod-spec', 'p-prod-package', 'p-prod-service',
+            'p-price-strategy', 'p-price-discount', 'p-price-margin', 'p-price-compare',
+            'p-place-online', 'p-place-offline', 'p-place-logistics', 'p-place-partner',
+            'p-promo-ad', 'p-promo-sns', 'p-promo-influencer', 'p-promo-event'
+        ];
+
+        const SAMPLE_DATA = {
+            headers: ['프로젝트/품목', '분류', '목표 수량', '달성 수량', '달성률(%)', '담당 부서', '상태'],
+            rows: [
+                ['AI 대시보드 개발', 'IT/소프트웨어', 120, 115, 95.8, '개발 1팀', '진행중'],
+                ['구글 시트 자동화', '데이터 솔루션', 85, 85, 100.0, '데이터팀', '완료'],
+                ['클라우드 마이그레이션', '인프라', 50, 42, 84.0, '인프라팀', '진행중'],
+                ['고객 지원 시스템 개선', '서비스', 200, 180, 90.0, 'CS팀', '완료'],
+                ['보안 취약점 점검', '보안', 30, 30, 100.0, '보안팀', '완료'],
+                ['신규 모바일 앱 디자인', '디자인', 90, 65, 72.2, '디자인팀', '진행중'],
+                ['영업 CRM 파이프라인', '영업', 150, 130, 86.7, '영업팀', '진행중'],
+                ['글로벌 마케팅 캠페인', '마케팅', 300, 290, 96.7, '마케팅팀', '완료'],
+                ['데이터베이스 최적화', 'IT/소프트웨어', 40, 38, 95.0, '개발 2팀', '완료']
+            ]
+        };
+
+        const presets = {
+            saas: {
+                'project-name': '클라우드인사이트 (CloudInsight)',
+                'target-audience': 'B2B IT 관리자 및 중소기업 C-Level',
+                'strategy-goal': 'MRR 1억 원 달성 및 전환율 12% 확보',
+                'p-prod-core': 'AI 기반 데이터 시각화 및 자동 리포팅 솔루션.',
+                'p-prod-spec': '베이직, 프로, 엔터프라이즈 구독 요금제.',
+                'p-prod-package': '클라우드 SaaS 웹 앱 및 직관적인 UI.',
+                'p-prod-service': '24/7 기술 지원 및 전담 CSM 배치.',
+                'p-price-strategy': '구독형 층위별 가격 정책 (Tiered Pricing).',
+                'p-price-discount': '연간
